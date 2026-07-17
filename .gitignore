@@ -1,0 +1,3 @@
+# Build/upload artifact — rebuild any time with:
+#   cd site && zip -r ../preview-site.zip .
+preview-site.zip
