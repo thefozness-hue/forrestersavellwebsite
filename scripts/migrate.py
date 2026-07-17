@@ -24,7 +24,9 @@ import re
 import shutil
 import sys
 
-FORM_EMAIL = "info@forrestersavell.com"
+# FormSubmit alias for info@forrestersavell.com — keeps the real address out
+# of the page source. Manage/regenerate it at https://formsubmit.co
+FORM_EMAIL = "91a1223c984b6618ba452587ad02f2fb"
 
 STATIC_FORM = """<div id="nf-form-1-cont" class="nf-form-cont" aria-live="polite" role="form">
 <form class="static-contact-form" action="https://formsubmit.co/%s" method="POST">
