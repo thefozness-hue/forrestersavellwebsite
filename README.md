@@ -66,14 +66,26 @@ The site also works on any static host (Cloudflare Pages, Netlify, GitHub
 Pages) — `.htaccess` is Apache-only, so on those hosts the redirects/404 would
 need their equivalent config.
 
-## Updating content later
+## Updating content later — there is no admin login (by design)
 
-Everything is plain HTML — edit `site/index.html` and re-upload. To add a new
-release to the Artists grid, copy one of the existing
-`<div class="gb-grid-column …">` blocks inside the `id="artists"` section,
-change the artist/title/roles text and point it at a new 600×600 image in
-`wp-content/uploads/`. (Or open this repo in Claude Code and ask it to add the
-release for you.)
+The old WordPress admin panel is gone on purpose — a live backend was the
+thing that kept getting exploited. Instead, you update the site by **opening
+this repo in Claude Code and asking** — e.g. *"add a new release: Karnivool –
+In Verses, I mixed and mastered it, here's the album art."* Claude knows how
+to do this: the full recipe (grid markup, image sizes, role classes, which
+pages to touch) is written up in [`CLAUDE.md`](CLAUDE.md), which Claude Code
+loads automatically.
+
+If you ever want to hand-edit: everything is plain HTML — edit
+`site/index.html`, copy an existing `<div class="gb-grid-column …">` tile
+inside the `id="artists"` section, change the artist/title/roles and point it
+at a new square image in `wp-content/uploads/`, then re-upload.
+
+If updating by hand ever feels like too much, two upgrades are possible later
+without giving up security: (1) make the site data-driven so releases come
+from one simple list, or (2) add a proper login-protected admin UI (a
+git-based CMS like Decap/Sveltia) paired with free auto-deploy hosting. Ask
+Claude about either.
 
 ## Local preview
 
