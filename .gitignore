@@ -1,3 +1,5 @@
-# Build/upload artifact — rebuild any time with:
+# Build/upload artifacts — rebuild any time with:
 #   cd site && zip -r ../preview-site.zip .
 preview-site.zip
+forrestersavell-golive.zip
+*.zip
