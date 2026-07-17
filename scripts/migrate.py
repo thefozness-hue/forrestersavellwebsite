@@ -24,15 +24,11 @@ import re
 import shutil
 import sys
 
-# FormSubmit alias for info@forrestersavell.com — keeps the real address out
-# of the page source. Manage/regenerate it at https://formsubmit.co
-FORM_EMAIL = "91a1223c984b6618ba452587ad02f2fb"
-
+# The contact form posts to site/contact.php — a small hardened mail handler
+# that emails submissions from the site's own domain (clean, no third-party
+# branding). See site/contact.php for the handler itself.
 STATIC_FORM = """<div id="nf-form-1-cont" class="nf-form-cont" aria-live="polite" role="form">
-<form class="static-contact-form" action="https://formsubmit.co/%s" method="POST">
-<input type="hidden" name="_subject" value="New message from forrestersavell.com">
-<input type="hidden" name="_captcha" value="false">
-<input type="hidden" name="_next" value="https://forrestersavell.com/thanks/">
+<form class="static-contact-form" action="/contact.php" method="POST">
 <input type="text" name="_honey" style="display:none !important" tabindex="-1" autocomplete="off" aria-hidden="true">
 <p class="scf-required">All fields are required</p>
 <div class="scf-field"><label class="screen-reader-text" for="scf-name">Name</label><input id="scf-name" type="text" name="name" placeholder="Name" required></div>
@@ -43,11 +39,11 @@ STATIC_FORM = """<div id="nf-form-1-cont" class="nf-form-cont" aria-live="polite
 </div>
 <style id="static-contact-form-css">
 .static-contact-form .scf-field{margin-bottom:20px}
-.static-contact-form input[type=text],.static-contact-form input[type=email],.static-contact-form textarea{width:100%%;padding:12px 16px;border:1px solid var(--base);border-radius:0;box-sizing:border-box}
+.static-contact-form input[type=text],.static-contact-form input[type=email],.static-contact-form textarea{width:100%;padding:12px 16px;border:1px solid var(--base);border-radius:0;box-sizing:border-box}
 .static-contact-form textarea{resize:vertical}
 .static-contact-form input[type=submit]{padding:14px 18px;border:0;cursor:pointer}
 .static-contact-form .scf-required{margin-bottom:20px}
-</style>""" % FORM_EMAIL
+</style>"""
 
 
 def read(path):

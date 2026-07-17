@@ -107,8 +107,14 @@ File Manager. `preview-site.zip` is a git-ignored build artifact, rebuilt from
 - Keep changes matching the surrounding markup and the existing `gb-*` class
   names — don't "modernize" the HTML or strip classes; the inline
   `generateblocks` CSS depends on them.
-- Never reintroduce a server-side backend (PHP, a database, an admin login).
-  The whole point of this rebuild is that there's nothing dynamic to exploit.
-- The contact form posts to a FormSubmit alias (see `scripts/migrate.py`),
-  which keeps the real email out of the page source. Don't replace it with the
-  plain address.
+- Never reintroduce a WordPress-style backend — no database, no admin login, no
+  plugin/theme system, no CMS. That ecosystem (dozens of auto-updating plugins
+  with admin access) is what made the old site exploitable, and avoiding it is
+  the whole point of this rebuild.
+- The ONE deliberate exception is `site/contact.php` — a single, hardened,
+  dependency-free mail handler for the contact form. It emails submissions from
+  the site's own domain so notifications are clean (no third-party branding).
+  It has no admin/database and never needs updating. Keep it hardened: fixed
+  recipient only, CR/LF stripped from header fields, honeypot, per-IP rate
+  limit, validated/length-limited inputs. Don't point the form back at a
+  third-party form service.

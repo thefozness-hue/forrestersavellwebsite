@@ -3,3 +3,7 @@
 preview-site.zip
 forrestersavell-golive.zip
 *.zip
+
+# Python bytecode
+__pycache__/
+*.pyc
