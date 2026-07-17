@@ -7,3 +7,6 @@ forrestersavell-golive.zip
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Local deploy credentials (never commit)
+deploy.env
