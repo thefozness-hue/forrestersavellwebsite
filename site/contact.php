@@ -43,8 +43,6 @@ $SUCCESS   = '/thanks/';                  // shown on success
 $TOKEN_SECRET = '335bbc3439bc17d769b7d7f2b598b01d2fec7256b036e4ee8181219d455ef994';
 $TOKEN_MAX_AGE = 21600;                   // 6 hours — covers a page left open
 
-$ALLOWED_HOSTS = ['forrestersavell.com', 'www.forrestersavell.com'];
-
 $MAX_NAME    = 100;
 $MAX_EMAIL   = 254;
 $MAX_MESSAGE = 5000;
@@ -123,11 +121,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 // ---------- 1. same-origin check ----------
-// Browsers send Origin on cross-origin form POSTs and (in modern versions)
-// on same-origin ones too. If either header is present it must be ours.
-foreach (['HTTP_ORIGIN' => $_SERVER['HTTP_ORIGIN'] ?? '',
-          'HTTP_REFERER' => $_SERVER['HTTP_REFERER'] ?? ''] as $value) {
-    if ($value !== '' && !in_array(host_of($value), $ALLOWED_HOSTS, true)) {
+// Browsers send Origin on cross-origin form POSTs and (in modern versions) on
+// same-origin ones too. If either header is present it must match the host
+// this request arrived on. Deriving the allowed host from the request itself
+// (rather than hard-coding the domain) means this can never silently reject a
+// genuine visitor — on the live domain, a www. address, a staging subdomain
+// or a local copy — while still turning away forms posted from other sites.
+$self_host = strtolower(preg_replace('~:\d+$~', '', $_SERVER['HTTP_HOST'] ?? ''));
+$allowed_hosts = array_filter([
+    $self_host,
+    preg_match('~^www\.~', $self_host) ? preg_replace('~^www\.~', '', $self_host) : 'www.' . $self_host,
+]);
+foreach ([$_SERVER['HTTP_ORIGIN'] ?? '', $_SERVER['HTTP_REFERER'] ?? ''] as $value) {
+    if ($value !== '' && $self_host !== ''
+        && !in_array(host_of($value), $allowed_hosts, true)) {
         redirect($SUCCESS);   // silently absorb — off-site POST, certainly a bot
     }
 }
@@ -157,7 +164,17 @@ if (strlen($email) > $MAX_EMAIL || !filter_var($email, FILTER_VALIDATE_EMAIL)) f
 if ($message === '' || strlen($message) > $MAX_MESSAGE) fail_validate();
 
 // ---------- 4. content filters ----------
-$links = preg_match_all('~https?://|www\.~i', $name . ' ' . $message);
+// Count links, but ignore the music and file-sharing services real clients
+// send all the time (an artist linking three Bandcamp tracks is the most
+// normal enquiry there is — it must never look like spam).
+$FRIENDLY = '(bandcamp\.com|spotify\.com|youtube\.com|youtu\.be|soundcloud\.com|'
+          . 'wetransfer\.com|dropbox\.com|drive\.google\.com|music\.apple\.com|'
+          . 'tidal\.com|vimeo\.com|instagram\.com|facebook\.com|linktr\.ee)';
+preg_match_all('~(?:https?://|www\.)([^\s/]+)~i', $name . ' ' . $message, $found);
+$links = 0;
+foreach ($found[1] as $host) {
+    if (!preg_match('~' . $FRIENDLY . '$~i', $host)) $links++;
+}
 
 // Certain spam — drop silently so the sender believes it worked.
 $certain_spam =
@@ -174,7 +191,7 @@ if ($certain_spam) {
 // it can be filtered, and so a real enquiry is never silently lost.
 $spam_words = '~\b(seo|backlinks?|link.?building|guest post|indexing|rank higher|'
             . 'crypto|casino|promo code|web development services|traffic boost)\b~i';
-$suspicious = ($links >= 2) || preg_match($spam_words, $message);
+$suspicious = ($links >= 3) || preg_match($spam_words, $message);
 
 // ---------- 5. gentle per-IP rate limit (best-effort; fails open) ----------
 $bucket = sys_get_temp_dir() . '/fs_contact_' . md5($ip);
