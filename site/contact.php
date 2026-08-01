@@ -224,6 +224,7 @@ $headers  = 'From: ' . $FROM_NAME . ' <' . $FROM . ">\r\n";
 $headers .= 'Reply-To: ' . $email . "\r\n";   // validated, CR/LF-stripped — safe
 $headers .= "MIME-Version: 1.0\r\n";
 $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+$headers .= "Content-Transfer-Encoding: 8bit\r\n";
 $headers .= "X-Mailer: forrestersavell-contact\r\n";
 
 $ok = @mail($TO, $subject, $body, $headers, '-f' . $FROM);

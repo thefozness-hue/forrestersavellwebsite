@@ -992,7 +992,16 @@ h4.gb-headline a {
 	var form = document.querySelector('.static-contact-form');
 	if (!form || !window.fetch) return;
 	var field = form.querySelector('input[name="_t"]');
+	var button = form.querySelector('input[type="submit"]');
 	var pending = null;
+
+	/* Give feedback while sending — on a slow connection the token fetch can
+	   take a moment, and a button that looks dead invites a second click. */
+	function sending() {
+		if (!button) return;
+		button.value = 'Sending…';
+		button.disabled = true;
+	}
 
 	function getToken() {
 		if (pending) return pending;
@@ -1006,6 +1015,7 @@ h4.gb-headline a {
 
 	getToken();
 	form.addEventListener('submit', function (e) {
+		sending();
 		if (field.value) return;            // already have one — submit normally
 		e.preventDefault();                 // otherwise fetch, then send
 		getToken().then(function () { form.submit(); });
