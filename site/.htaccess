@@ -29,6 +29,28 @@ RedirectMatch 410 ^/xmlrpc\.php
   # HSTS on the apex host only — deliberately no includeSubDomains/preload, so
   # the preview subdomain isn't forced to HTTPS. Only honored over HTTPS.
   Header always set Strict-Transport-Security "max-age=31536000"
+
+  # Content-Security-Policy. Only four external origins are real network loads:
+  #   fonts.googleapis.com  - the Poppins stylesheet   (style-src)
+  #   fonts.gstatic.com     - the font files           (font-src)
+  #   www.googletagmanager.com - gtag.js analytics     (script/img/connect-src)
+  #   open.spotify.com      - the playlist embed       (frame-src)
+  # Everything else (facebook/twitter/instagram/swiftsites/nailthemix) is only
+  # <a href> links, and w3.org/schema.org are XML namespaces + JSON-LD strings —
+  # none of those are fetched, so none need allowlisting.
+  #
+  # 'unsafe-inline' is required for scripts and styles: the pages carry inline
+  # <style> blocks, inline style="" attributes and inline scripts (the gtag
+  # snippet and the contact-form token script). Nonces would need server-side
+  # rendering, and hashes would silently break the form on every content edit.
+  # So this policy is not a full XSS defence — its value is blocking injected
+  # off-site script/frame/form targets, plus base-uri and object-src lockdown.
+  #
+  # Verified in a real browser as Report-Only first: zero violations from the
+  # site's own resources (fonts, GTM/analytics, Spotify embed and the contact
+  # form's token fetch all passed), with a deliberate off-origin probe proving
+  # violations were being detected. Then switched to enforcing.
+  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com; connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com; frame-src https://open.spotify.com; upgrade-insecure-requests"
 </IfModule>
 
 <IfModule mod_expires.c>
