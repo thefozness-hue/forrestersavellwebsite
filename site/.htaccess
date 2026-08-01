@@ -1,5 +1,15 @@
 # Static site — no PHP, no database.
 
+# Force HTTPS. Proxy-aware: cPanel may terminate TLS upstream, so only redirect
+# when the request is genuinely plain HTTP (both checks must indicate HTTP) —
+# that way an upstream-HTTPS request is never redirected and can't loop.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
 ErrorDocument 404 /404.html
 
 # The old per-release WordPress pages were byte-identical copies of the
@@ -16,6 +26,9 @@ RedirectMatch 410 ^/xmlrpc\.php
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  # HSTS on the apex host only — deliberately no includeSubDomains/preload, so
+  # the preview subdomain isn't forced to HTTPS. Only honored over HTTPS.
+  Header always set Strict-Transport-Security "max-age=31536000"
 </IfModule>
 
 <IfModule mod_expires.c>
