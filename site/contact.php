@@ -16,7 +16,9 @@
  *                            WordPress form did implicitly by rendering
  *                            itself in JS, and it is what stops the
  *                            scrape-and-POST spam bots.
- *   4. Content filters     — BBCode link spam, Cyrillic+link, link floods
+ *   4. Content filters     — BBCode link spam, Cyrillic+link, link floods,
+ *                            keyboard-mash gibberish, generated Gmail
+ *                            addresses, implausibly fast submissions
  *   5. Per-IP rate limit   — caps flooding
  *   6. Strict validation   — length limits, real email address
  *   7. Header hardening    — CR/LF stripped, fixed recipient (no open relay)
@@ -107,6 +109,42 @@ function host_of($url) {
     return $host ? strtolower($host) : '';
 }
 
+/**
+ * True when a string reads like keyboard mash rather than language.
+ *
+ * Real words — in any language written in Latin script — keep roughly a third
+ * vowels and change letter case at most once or twice (a capital at the start
+ * of each word). Randomly generated strings like "ehqpILyHzTIHNKsFqCWO" are
+ * vowel-starved AND flip case constantly. BOTH must be true, which keeps
+ * legitimate names safe: checked against a spread of real-world names
+ * (Krzysztof Wojciechowski, Tsuyoshi Nakamura, Christopherson, McDonald,
+ * D'Angelo, MARK JOHNSON...) and none of them trip it. Strings under 10
+ * letters are never judged — too short to tell noise from a short name.
+ */
+function looks_random($s) {
+    $letters = preg_replace('/[^A-Za-z]/', '', $s);
+    $len = strlen($letters);
+    if ($len < 10) return false;
+    $vowel_ratio = preg_match_all('/[aeiouAEIOU]/', $letters) / $len;
+    $flips = 0;
+    for ($i = 1; $i < $len; $i++) {
+        if (ctype_upper($letters[$i]) !== ctype_upper($letters[$i - 1])) $flips++;
+    }
+    return $vowel_ratio < 0.25 && ($flips / $len) > 0.25;
+}
+
+/**
+ * Gmail ignores dots in addresses, so one account can spray endlessly many
+ * unique-looking senders ("r.i.y.a.r.a.h.i.jez.05.8@gmail.com"). Real people
+ * use at most a couple; four or more is address-generation.
+ */
+function gmail_dot_abuse($email) {
+    $parts = explode('@', strtolower($email));
+    if (count($parts) !== 2) return false;
+    if (!in_array($parts[1], ['gmail.com', 'googlemail.com'], true)) return false;
+    return substr_count($parts[0], '.') >= 4;
+}
+
 // ---------- token endpoint: GET /contact.php?t=1 ----------
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && isset($_GET['t'])) {
     header('Content-Type: application/json; charset=UTF-8');
@@ -145,9 +183,17 @@ if (!empty($_POST['_honey'])) {
 }
 
 // ---------- 3. signed token: proves our page + JavaScript produced this ----------
-if (!token_valid($_POST['_t'] ?? '', $ip, $TOKEN_SECRET, $TOKEN_MAX_AGE)) {
+$token = (string) ($_POST['_t'] ?? '');
+if (!token_valid($token, $ip, $TOKEN_SECRET, $TOKEN_MAX_AGE)) {
     fail_token();
 }
+
+// How long the page was open before this was submitted. Typing a name, an
+// email and a message takes a person several seconds; a script posts the
+// instant it has a token. Only ever used to FLAG, never to drop — if the
+// page-load token fetch failed, the form fetches one as it submits, and that
+// legitimate path also looks instant.
+$fill_seconds = time() - (int) strstr($token, '.', true);
 
 // ---------- gather + normalise ----------
 $name    = isset($_POST['name'])    ? trim((string) $_POST['name'])    : '';
@@ -176,12 +222,25 @@ foreach ($found[1] as $host) {
     if (!preg_match('~' . $FRIENDLY . '$~i', $host)) $links++;
 }
 
+// Gibberish signals. Judged separately so that one odd-looking field alone
+// never loses a message — an unusual name with a real enquiry attached is
+// merely flagged, not dropped.
+$random_name    = looks_random($name);
+$random_message = looks_random($message);
+$dot_abuse      = gmail_dot_abuse($email);
+
 // Certain spam — drop silently so the sender believes it worked.
 $certain_spam =
        preg_match('~\[/?url~i', $message)                            // BBCode link spam
     || preg_match('~\p{Cyrillic}~u', $message) && $links > 0          // Cyrillic + link
     || preg_match('~https?://|www\.~i', $name)                       // URL in the name field
-    || $links > 5;                                                   // link flood
+    || $links > 5                                                    // link flood
+    // Keyboard mash in BOTH the name and the message. Requiring both is what
+    // makes this safe to drop: no genuine enquiry has a random name attached
+    // to a random message.
+    || ($random_name && $random_message)
+    // A generated Gmail address paired with either field reading as noise.
+    || ($dot_abuse && ($random_name || $random_message));
 
 if ($certain_spam) {
     redirect($SUCCESS);
@@ -191,7 +250,12 @@ if ($certain_spam) {
 // it can be filtered, and so a real enquiry is never silently lost.
 $spam_words = '~\b(seo|backlinks?|link.?building|guest post|indexing|rank higher|'
             . 'crypto|casino|promo code|web development services|traffic boost)\b~i';
-$suspicious = ($links >= 3) || preg_match($spam_words, $message);
+$suspicious = ($links >= 3)
+    || preg_match($spam_words, $message)
+    || $random_name || $random_message || $dot_abuse
+    || $fill_seconds < 4                                             // posted too fast to have been typed
+    // A 12-plus character message with no space at all is not a sentence.
+    || (strlen($message) >= 12 && !preg_match('~\s~', $message));
 
 // ---------- 5. gentle per-IP rate limit (best-effort; fails open) ----------
 $bucket = sys_get_temp_dir() . '/fs_contact_' . md5($ip);
