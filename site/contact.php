@@ -11,11 +11,9 @@
  *
  *   1. Same-origin check   — the POST must come from our own page
  *   2. Honeypot            — hidden field only bots fill in
- *   3. Signed token        — the form must ask us for a token via JavaScript
- *                            first (see "token" below). This is what the old
- *                            WordPress form did implicitly by rendering
- *                            itself in JS, and it is what stops the
- *                            scrape-and-POST spam bots.
+ *   3. Signed token        — the form must fetch a token before posting
+ *                            (see "token" below). Stops bots that blindly
+ *                            POST, but see the honest limits noted there.
  *   4. Content filters     — BBCode link spam, Cyrillic+link, link floods,
  *                            keyboard-mash gibberish, generated Gmail
  *                            addresses, implausibly fast submissions
@@ -25,11 +23,25 @@
  *
  * ---- token ----
  * GET /contact.php?t=1 returns {"token":"<issued-at>.<signature>"}. The
- * signature is an HMAC over the issue time + the visitor's IP, so tokens
- * can't be forged or reused from elsewhere. The page fetches one with
- * JavaScript and posts it back in a hidden field. A bot that simply POSTs
- * to this script without executing our JavaScript has no valid token and
- * is turned away.
+ * signature is an HMAC over the issue time + the visitor's IP, so a token
+ * cannot be forged, reused from another address, or replayed after it
+ * expires. The page fetches one with JavaScript and posts it back in a
+ * hidden field.
+ *
+ * KNOW WHAT THIS DOES NOT DO. It is NOT the equivalent of the old
+ * JavaScript-rendered WordPress form, and it does NOT prove a browser ran
+ * our JavaScript. The endpoint is a plain URL visible in the page source,
+ * so any script can simply fetch a token and post it — two requests instead
+ * of one. Verified: a bare curl fetch-then-post passes this gate. What it
+ * genuinely stops is the common bot that blindly POSTs a scraped form
+ * without fetching a token first.
+ *
+ * Consequence: the token is a speed bump, and the content filters below are
+ * pattern-matching that a spammer can word around. If spam volume ever
+ * justifies it, the real fix is a challenge service (e.g. Cloudflare
+ * Turnstile) or a proof-of-work step — something a plain script cannot
+ * replicate cheaply. Deliberately not added yet: volume is low and neither
+ * belongs between a real client and this form without cause.
  */
 
 // ---------- config ----------
